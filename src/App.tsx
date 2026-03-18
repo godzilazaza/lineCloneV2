@@ -347,7 +347,8 @@ const ChatItem = ({ chat, currentUser, onClick, onDelete }: { chat: Chat, curren
     return unsub;
   }, [chat.id, currentUser.uid]);
 
-  const displayName = isGroup ? `${chat.name} (${chat.participants.length})` : otherUser?.displayName || 'Loading...';
+  const chatName = isGroup ? chat.name : (otherUser?.displayName || 'Loading...');
+  const memberCount = isGroup ? chat.participants.length : null;
   const photoURL = isGroup 
     ? (chat.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${chat.name}`)
     : (otherUser?.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUserId}`);
@@ -374,7 +375,8 @@ const ChatItem = ({ chat, currentUser, onClick, onDelete }: { chat: Chat, curren
         <div className="flex-1 min-w-0">
           <div className="flex justify-between items-baseline mb-0.5">
             <div className="flex items-center gap-1 min-w-0">
-              <h3 className="font-bold text-gray-900 truncate text-base">{displayName}</h3>
+              <h3 className="font-bold text-gray-900 truncate text-[15px] flex-shrink min-w-0">{chatName}</h3>
+              {memberCount !== null && <span className="font-bold text-gray-900 text-[15px] flex-shrink-0">({memberCount})</span>}
               {!isGroup && otherUser?.isOfficial && <VerifiedBadge />}
             </div>
             <span className="text-[10px] text-gray-400 font-medium">
@@ -382,7 +384,7 @@ const ChatItem = ({ chat, currentUser, onClick, onDelete }: { chat: Chat, curren
             </span>
           </div>
           <div className="flex justify-between items-center">
-            <p className="text-sm text-gray-500 truncate flex-1 leading-snug">
+            <p className="text-[13px] text-gray-500 truncate flex-1 leading-snug">
               {chat.lastMessage?.text || 'No messages yet'}
             </p>
             {unreadCount > 0 && (
@@ -486,18 +488,25 @@ const MessageItem = ({ msg, isMe, isGroup, showAvatar, showTail, currentUser, ch
   const renderTextWithMentions = (text: string, mentions?: string[]) => {
     if (!mentions || mentions.length === 0) return text;
 
-    const parts = text.split(/(@\w+)/g);
+    // Create a list of mention tags to look for
+    const mentionTags = participants
+      .filter(u => mentions.includes(u.uid))
+      .map(u => `@${u.displayName.replace(/\s/g, '')}`);
+
+    if (mentionTags.length === 0) return text;
+
+    // Escape tags for regex and join with |
+    const escapedTags = mentionTags.map(tag => tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const regex = new RegExp(`(${escapedTags.join('|')})`, 'g');
+
+    const parts = text.split(regex);
     return parts.map((part, i) => {
-      if (part.startsWith('@')) {
-        const name = part.substring(1);
-        const mentionedUser = participants.find(u => u.displayName.replace(/\s/g, '') === name);
-        if (mentionedUser && mentions.includes(mentionedUser.uid)) {
-          return (
-            <span key={i} className="text-[#4D6AFF] font-bold cursor-pointer hover:underline">
-              {part}
-            </span>
-          );
-        }
+      if (mentionTags.includes(part)) {
+        return (
+          <span key={i} className="text-[#4D6AFF] font-bold cursor-pointer hover:underline">
+            {part}
+          </span>
+        );
       }
       return part;
     });
@@ -520,13 +529,13 @@ const MessageItem = ({ msg, isMe, isGroup, showAvatar, showTail, currentUser, ch
       <div className={cn("flex flex-col", isMe ? "items-end" : "items-start")}>
         {!isMe && isGroup && showAvatar && (
           <div className="flex items-center gap-1 mb-1 ml-1">
-            <span className="text-[11px] text-gray-400 font-medium">{sender?.displayName || 'User'}</span>
+            <span className="text-[10px] text-gray-400 font-medium">{sender?.displayName || 'User'}</span>
             {sender?.isOfficial && <VerifiedBadge className="w-2.5 h-2.5" />}
           </div>
         )}
         <div className={cn("flex items-end gap-1.5", isMe ? "flex-row-reverse" : "flex-row")}>
           <div className={cn(
-            "max-w-[260px] p-2.5 rounded-[18px] text-[15px] relative leading-tight",
+            "max-w-[260px] p-2.5 rounded-[18px] text-[14px] relative leading-tight",
             isMe ? "bg-[#06C755] text-black" : "bg-[#2C2C2E] text-white",
             isMe && showTail && "rounded-tr-none",
             !isMe && showTail && "rounded-tl-none",
@@ -820,7 +829,7 @@ const ChatRoom = ({ chat, currentUser, onBack, allChats }: { chat: Chat, current
       });
       
       const link = document.createElement('a');
-      link.download = `line-chat-${displayName}-${format(new Date(), 'yyyyMMdd-HHmmss')}.png`;
+      link.download = `line-chat-${chatName}-${format(new Date(), 'yyyyMMdd-HHmmss')}.png`;
       link.href = dataUrl;
       link.click();
     } catch (err) {
@@ -928,7 +937,8 @@ const ChatRoom = ({ chat, currentUser, onBack, allChats }: { chat: Chat, current
     }
   };
 
-  const displayName = isGroup ? `${chat.name} (${chat.participants.length})` : otherUser?.displayName || 'Chat';
+  const chatName = isGroup ? chat.name : (otherUser?.displayName || 'Chat');
+  const memberCount = isGroup ? chat.participants.length : null;
   const photoURL = isGroup 
     ? (chat.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${chat.name}`)
     : (otherUser?.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUserId}`);
@@ -959,12 +969,13 @@ const ChatRoom = ({ chat, currentUser, onBack, allChats }: { chat: Chat, current
       <div className="bg-[#191919] p-3 flex items-center gap-1 sticky top-0 z-10">
         <button onClick={onBack} className="p-1 hover:bg-white/5 rounded-full text-white flex items-center">
           <ChevronLeft className="w-8 h-8" strokeWidth={1.5} />
-          <span className="text-[16px] font-bold -ml-1.5">99+</span>
+          <span className="text-[15px] font-bold -ml-1.5">99+</span>
         </button>
         <div className="flex-1 flex flex-col ml-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            {!isGroup && otherUser?.isOfficial && <VerifiedBadge className="w-5 h-5" />}
-            <h3 className="font-bold text-white leading-tight truncate text-[18px]">{displayName}</h3>
+          <div className="flex items-center gap-1.5 min-w-0">
+            {!isGroup && otherUser?.isOfficial && <VerifiedBadge className="w-5 h-5 flex-shrink-0" />}
+            <h3 className="font-bold text-white leading-tight truncate text-[16px] flex-shrink min-w-0">{chatName}</h3>
+            {memberCount !== null && <span className="font-bold text-white text-[16px] flex-shrink-0">({memberCount})</span>}
           </div>
           {!isGroup && otherUser?.isOfficial && (
             <span className="text-[10px] text-[#4D6AFF] font-bold leading-tight mt-0.5">ผู้รับผิดชอบเป็นผู้ตอบกลับ</span>
@@ -1691,7 +1702,7 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <div className="max-w-md mx-auto h-screen bg-white shadow-2xl flex flex-col overflow-hidden relative border-x border-gray-100">
+      <div className="max-w-[428px] mx-auto h-screen bg-white shadow-2xl flex flex-col overflow-hidden relative border-x border-gray-100">
         <StatusBar dark={!!selectedChat} />
         <div className="flex-1 relative overflow-hidden">
           <AnimatePresence mode="wait">
@@ -1721,7 +1732,7 @@ export default function App() {
               >
                 {/* Header */}
                 <div className="p-4 flex justify-between items-center bg-white">
-                  <h1 className="text-2xl font-black text-gray-900 tracking-tight">
+                  <h1 className="text-[22px] font-black text-gray-900 tracking-tight">
                     {activeTab === 'chats' ? 'Chats' : activeTab === 'friends' ? 'Friends' : 'Profile'}
                   </h1>
                   <div className="flex gap-1">
