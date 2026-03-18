@@ -1,0 +1,5 @@
+{
+  "name": "LINE Clone",
+  "description": "A real-time chat application inspired by LINE, featuring instant messaging, friend lists, and profile management.",
+  "requestFramePermissions": []
+}

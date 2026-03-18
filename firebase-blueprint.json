@@ -1,0 +1,63 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Information about a user in the system.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The unique identifier for the user." },
+        "displayName": { "type": "string", "description": "The name displayed for the user." },
+        "photoURL": { "type": "string", "description": "The URL of the user's profile picture." },
+        "statusMessage": { "type": "string", "description": "A short status message." },
+        "lastSeen": { "type": "string", "format": "date-time", "description": "When the user was last active." }
+      },
+      "required": ["uid", "displayName"]
+    },
+    "Chat": {
+      "title": "Chat Room",
+      "description": "A conversation between two or more users.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "participants": { "type": "array", "items": { "type": "string" }, "description": "List of user UIDs in the chat." },
+        "lastMessage": {
+          "type": "object",
+          "properties": {
+            "text": { "type": "string" },
+            "createdAt": { "type": "string", "format": "date-time" },
+            "senderId": { "type": "string" }
+          }
+        },
+        "type": { "type": "string", "enum": ["direct", "group"] }
+      },
+      "required": ["participants", "type"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "An individual message within a chat.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "senderId": { "type": "string" },
+        "text": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "type": { "type": "string", "enum": ["text", "image"] }
+      },
+      "required": ["senderId", "text", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "User",
+      "description": "User profiles stored by UID."
+    },
+    "/chats/{chatId}": {
+      "schema": "Chat",
+      "description": "Chat metadata."
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Messages within a specific chat."
+    }
+  }
+}

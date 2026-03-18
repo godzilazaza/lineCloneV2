@@ -1,0 +1,86 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: users
+// Document ID: {uid}
+// Fields:
+//   - uid: string (required)
+//   - displayName: string (required)
+//   - photoURL: string (optional)
+//   - statusMessage: string (optional)
+//   - lastSeen: timestamp (optional)
+//
+// Collection: chats
+// Document ID: {chatId}
+// Fields:
+//   - participants: list of strings (required) - UIDs of users
+//   - type: string (required) - 'direct' or 'group'
+//   - lastMessage: map (optional)
+//
+// Collection: chats/{chatId}/messages
+// Document ID: {messageId}
+// Fields:
+//   - senderId: string (required)
+//   - text: string (required)
+//   - createdAt: timestamp (required)
+//   - type: string (required) - 'text' or 'image'
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isParticipant(chatId) {
+      return isAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'displayName']) &&
+             data.uid is string && data.uid.size() > 0 &&
+             data.displayName is string && data.displayName.size() > 0 && data.displayName.size() < 100;
+    }
+
+    function isValidMessage(data) {
+      return data.keys().hasAll(['senderId', 'text', 'createdAt', 'type']) &&
+             data.senderId is string &&
+             data.text is string && data.text.size() > 0 && data.text.size() < 5000 &&
+             data.type in ['text', 'image'];
+    }
+
+    function isValidChat(data) {
+      return data.keys().hasAll(['participants', 'type']) &&
+             data.participants is list && data.participants.size() >= 2 &&
+             data.type in ['direct', 'group'];
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{uid} {
+      allow read, write: if true;
+    }
+
+    match /chats/{chatId} {
+      allow read, write: if true;
+      
+      match /messages/{messageId} {
+        allow read, write: if true;
+      }
+    }
+  }
+}
