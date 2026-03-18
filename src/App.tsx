@@ -414,6 +414,51 @@ const MessageItem = ({ msg, isMe, isGroup, showAvatar, showTail, currentUser, ch
   const [isEditingTime, setIsEditingTime] = useState(false);
   const [editedTime, setEditedTime] = useState('');
   const [participants, setParticipants] = useState<UserProfile[]>([]);
+  const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = () => setContextMenu(null);
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    if (!isMe) return;
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleUnsend = async () => {
+    try {
+      await deleteDoc(doc(db, 'chats', chatId, 'messages', msg.id));
+      
+      if (chat.lastMessage?.createdAt?.toMillis() === msg.createdAt?.toMillis() && 
+          chat.lastMessage?.senderId === msg.senderId && 
+          chat.lastMessage?.text === msg.text) {
+        
+        const q = query(
+          collection(db, 'chats', chatId, 'messages'),
+          orderBy('createdAt', 'desc'),
+          limit(1)
+        );
+        const snapshot = await getDocs(q);
+        
+        if (!snapshot.empty) {
+          const newLastMsg = { ...snapshot.docs[0].data(), id: snapshot.docs[0].id } as Message;
+          await updateDoc(doc(db, 'chats', chatId), {
+            lastMessage: newLastMsg
+          });
+        } else {
+          await updateDoc(doc(db, 'chats', chatId), {
+            lastMessage: null
+          });
+        }
+      }
+      setContextMenu(null);
+    } catch (error) {
+      console.error("Error unsending message:", error);
+    }
+  };
 
   useEffect(() => {
     const fetchParticipants = async () => {
@@ -513,7 +558,10 @@ const MessageItem = ({ msg, isMe, isGroup, showAvatar, showTail, currentUser, ch
   };
 
   return (
-    <div className={cn("flex items-start gap-2", isMe ? "flex-row-reverse" : "flex-row", showTail ? "mt-3" : "mt-0.5")}>
+    <div 
+      className={cn("flex items-start gap-2", isMe ? "flex-row-reverse" : "flex-row", showTail ? "mt-3" : "mt-0.5")}
+      onContextMenu={handleContextMenu}
+    >
       {!isMe && (
         <div className="w-10 h-10 flex-shrink-0">
           {showAvatar && (
@@ -613,6 +661,26 @@ const MessageItem = ({ msg, isMe, isGroup, showAvatar, showTail, currentUser, ch
           </div>
         </div>
       </div>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <div 
+          className="fixed z-[100] bg-white shadow-xl rounded-lg border border-gray-100 py-1 min-w-[140px]"
+          style={{ 
+            left: Math.min(contextMenu.x, window.innerWidth - 150), 
+            top: Math.min(contextMenu.y, window.innerHeight - 50) 
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button 
+            onClick={handleUnsend}
+            className="w-full text-left px-4 py-2.5 text-[14px] text-red-500 hover:bg-red-50 transition-colors flex items-center gap-2"
+          >
+            <Trash2 className="w-4 h-4" />
+            <span>ยกเลิกข้อความ</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 };
